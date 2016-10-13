@@ -1,47 +1,34 @@
-import React, { Component } from 'react';
-import './App.css';
-
+import React, { Component, PropTypes } from 'react';
 class ReactViewPager extends Component {
 
   constructor(props) {
     super(props);
+    this.getTouchPos = this.getTouchPos.bind(this);
+    this.getSize = this.getSize.bind(this);
     this.handleTouchStart = this.handleTouchStart.bind(this);
     this.handleTouchMove = this.handleTouchMove.bind(this);
     this.handleTouchEnd = this.handleTouchEnd.bind(this);
-    this.getTouchPos = this.getTouchPos.bind(this);
-    this.getSize = this.getSize.bind(this);
 
     const size = this.getSize();
     this.state = {
       startX: 0,
       startY: 0,
-      moveX:  0,
-      moveY:  0,
-      pivotX: props.nowPageX ? props.nowPageX * size.width : 0, // pivot : 현재 보여줄 페이지의 좌표
+      moveX: 0,
+      moveY: 0,
+      // pivot : 현재 보여줄 페이지의 좌표
+      pivotX: props.nowPageX ? props.nowPageX * size.width : 0,
       pivotY: props.nowPageY ? props.nowPageY * size.height : 0,
       endX: 0,
       endY: 0,
-      nowPageX: props.nowPageX ? props.nowPageX : 0, // nowPage : 현재 보여줄 페이지의 번호
+      // nowPage : 현재 보여줄 페이지의 번호
+      nowPageX: props.nowPageX ? props.nowPageX : 0,
       nowPageY: props.nowPageY ? props.nowPageY : 0,
-      maxPageX: props.nowPageX ? props.maxPageX : props.children.length - 1, // maxPage : 최대로 넘어갈 페이지의 수
+      // maxPage : 최대로 넘어갈 페이지의 수
+      maxPageX: props.nowPageX ? props.maxPageX : props.children.length - 1,
       maxPageY: props.nowPageY ? props.maxPageY : props.children.length - 1,
     };
 
     this.resetTrigger = false;
-  }
-
-  getSize() {
-    return {
-      width: window.innerWidth || document.body.clientWidth,
-      height: window.innerHeight || document.body.clientHeight
-    };
-  }
-
-  getTouchPos(e) {
-    return {
-      x: e.changedTouches[0].clientX,
-      y: e.changedTouches[0].clientY,
-    }
   }
 
   componentDidMount() {
@@ -63,12 +50,24 @@ class ReactViewPager extends Component {
     const touchPos = this.getTouchPos(e);
     const moveX = touchPos.x;
     const moveY = touchPos.y;
-    this.setState({ moveX: moveX-startX, moveY: moveY-startY });
+    this.setState({ moveX: moveX - startX, moveY: moveY - startY });
   }
 
+  getSize() {
+    return {
+      width: window.innerWidth || document.body.clientWidth,
+      height: window.innerHeight || document.body.clientHeight,
+    };
+  }
+  getTouchPos(e) {
+    return {
+      x: e.changedTouches[0].clientX,
+      y: e.changedTouches[0].clientY,
+    };
+  }
   handleTouchEnd(e) {
     const { startX, startY, maxPageX, maxPageY } = this.state;
-    let { pivotX, pivotY, nowPageX, nowPageY } = this.state;
+    let { nowPageX, nowPageY } = this.state;
     const { isHorizontal, isVertical } = this.props;
     let { sensitivity } = this.props;
     if (!sensitivity) sensitivity = 20;
@@ -78,8 +77,8 @@ class ReactViewPager extends Component {
     const endX = touchPos.x;
     const endY = touchPos.y;
 
-    const deltaX =  endX - startX;
-    const deltaY =  endY - startY;
+    const deltaX = endX - startX;
+    const deltaY = endY - startY;
 
     if (isHorizontal) {
       if (deltaX >= sensitivity) {
@@ -126,7 +125,7 @@ class ReactViewPager extends Component {
     } = this.state;
     const { isHorizontal, isVertical } = this.props;
     const fromTransX = isHorizontal ? `translateX(${endX - startX}px)` : '';
-    const fromTransY = isVertical? `translateY(${endY - startY}px)` : '';
+    const fromTransY = isVertical ? `translateY(${endY - startY}px)` : '';
     const toTransX = isHorizontal ? `translateX(${-pivotX}px)` : '';
     const toTransY = isVertical ? `translateY(${-pivotY}px))` : '';
 
@@ -150,7 +149,7 @@ class ReactViewPager extends Component {
 
   getGroupStyle() {
     const { moveX, moveY, pivotX, pivotY } = this.state;
-    let { isHorizontal, isVertical } = this.props;
+    const { isHorizontal, isVertical } = this.props;
     const posX = isHorizontal ? moveX - pivotX : 0;
     const posY = isVertical ? moveY - pivotY : 0;
 
@@ -158,7 +157,7 @@ class ReactViewPager extends Component {
       transform: `translateX(${posX}px) translateY(${posY}px)`, height: 'inherit',
     };
 
-    if(this.resetTrigger) {
+    if (this.resetTrigger) {
       style = this.getResetActionStyle();
       this.resetTrigger = false;
     }
@@ -176,13 +175,11 @@ class ReactViewPager extends Component {
 
     const { children } = this.props;
     if (children) {
-      return children.map((child, sequence) => {
-        return (
-          <div key={`${sequence}`} style={{ ...childStyle, left: size.width * sequence }}>
-            {child}
-          </div>
-        );
-      });
+      return children.map((child, sequence) =>
+        <div key={`${sequence}`} style={{ ...childStyle, left: size.width * sequence }}>
+          {child}
+        </div>
+      );
     }
     return [];
   }
@@ -202,5 +199,16 @@ class ReactViewPager extends Component {
     );
   }
 }
+
+ReactViewPager.propTypes = {
+  children: PropTypes.array.isRequired,
+  isHorizontal: PropTypes.bool,
+  isVertical: PropTypes.bool,
+  nowPageX: PropTypes.number,
+  nowPageY: PropTypes.number,
+  maxPageX: PropTypes.number,
+  maxPageY: PropTypes.number,
+  sensitivity: PropTypes.number,
+};
 
 export default ReactViewPager;
