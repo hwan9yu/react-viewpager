@@ -1,4 +1,6 @@
 import React, { Component, PropTypes } from 'react';
+const INTERPORATION_INTERVAL = 125;
+
 class ReactViewPager extends Component {
 
   constructor(props) {
@@ -29,6 +31,15 @@ class ReactViewPager extends Component {
     };
 
     this.resetTrigger = false;
+    this.interporateTimer = 0;
+
+    this.startTime = new Date();
+    this.endTime = new Date();
+
+    this.preMoveX = 0; // 디바운스 인터폴레이션을 위함
+    this.preMoveY = 0;
+
+    this.animationCnt = 0;
   }
 
   componentDidMount() {
@@ -42,15 +53,25 @@ class ReactViewPager extends Component {
     const touchPos = this.getTouchPos(e);
     const startX = touchPos.x - moveX;
     const startY = touchPos.y - moveY;
+    this.preMoveX = 0;
+    this.preMoveY = 0;
     this.setState({ startX, startY });
   }
 
   handleTouchMove(e) {
-    const { startX, startY } = this.state;
-    const touchPos = this.getTouchPos(e);
-    const moveX = touchPos.x;
-    const moveY = touchPos.y;
-    this.setState({ moveX: moveX - startX, moveY: moveY - startY });
+    this.endTime = new Date();
+    this.interporateTimer += this.endTime - this.startTime;
+    this.startTime = this.endTime;
+
+    if (this.interporateTimer >= INTERPORATION_INTERVAL) {
+      const { startX, startY } = this.state;
+      const touchPos = this.getTouchPos(e);
+      this.preMoveX = this.state.moveX;
+      this.preMoveY = this.state.moveY;
+      const moveX = touchPos.x - startX;
+      const moveY = touchPos.y - startY;
+      this.setState({ moveX, moveY });
+    }
   }
 
   getSize() {
@@ -71,7 +92,6 @@ class ReactViewPager extends Component {
     const { isHorizontal, isVertical } = this.props;
     let { sensitivity } = this.props;
     if (!sensitivity) sensitivity = 20;
-
     const size = this.getSize();
     const touchPos = this.getTouchPos(e);
     const endX = touchPos.x;
@@ -102,6 +122,9 @@ class ReactViewPager extends Component {
     if (nowPageY > maxPageY) nowPageY = maxPageY;
 
     this.resetTrigger = true;
+
+    this.preMoveX = 0;
+    this.preMoveY = 0;
     this.setState({
       endX: endX - this.state.pivotX, // don't remove this.state.
       endY: endY - this.state.pivotY,
@@ -127,7 +150,7 @@ class ReactViewPager extends Component {
     const fromTransX = isHorizontal ? `translateX(${endX - startX}px)` : '';
     const fromTransY = isVertical ? `translateY(${endY - startY}px)` : '';
     const toTransX = isHorizontal ? `translateX(${-pivotX}px)` : '';
-    const toTransY = isVertical ? `translateY(${-pivotY}px))` : '';
+    const toTransY = isVertical ? `translateY(${-pivotY}px)` : '';
 
     const styleSheet = document.styleSheets[0];
     const keyframes = `@-webkit-keyframes reset {
@@ -141,7 +164,7 @@ class ReactViewPager extends Component {
     styleSheet.insertRule(keyframes, styleSheet.cssRules.length);
 
     return {
-      transform: `translateX(${-pivotX}px) translateY(${-pivotY}px)`,
+      transform: `${toTransX} ${toTransY}`,
       animation: 'reset .3s ease-out',
       height: 'inherit',
     };
@@ -150,12 +173,33 @@ class ReactViewPager extends Component {
   getGroupStyle() {
     const { moveX, moveY, pivotX, pivotY } = this.state;
     const { isHorizontal, isVertical } = this.props;
+    const { preMoveX, preMoveY } = this;
+
+    const prePosX = isHorizontal ? preMoveX - pivotX : 0;
+    const prePosY = isVertical ? preMoveY - pivotY : 0;
     const posX = isHorizontal ? moveX - pivotX : 0;
     const posY = isVertical ? moveY - pivotY : 0;
 
     let style = {
-      transform: `translateX(${posX}px) translateY(${posY}px)`, height: 'inherit',
+      transform: `translateX(${prePosX}px) translateY(${prePosY}px)`,
+      height: 'inherit',
     };
+
+    if (this.interporateTimer >= 100) {
+      const styleSheet = document.styleSheets[0];
+      this.animationCnt += 1;
+      const keyframes = `@-webkit-keyframes interpolate${this.animationCnt} {
+        from {
+          transform: translateX(${prePosX}px) translateY(${prePosY}px);
+        }
+        to {
+          transform: translateX(${posX}px) translateY(${posY}px);
+        } 
+      }`;
+      styleSheet.insertRule(keyframes, styleSheet.cssRules.length);
+      style.animation = `interpolate${this.animationCnt} ${this.interporateTimer}ms linear`;
+      this.interporateTimer = 0;
+    }
 
     if (this.resetTrigger) {
       style = this.getResetActionStyle();
