@@ -1,5 +1,5 @@
 import React, { Component, PropTypes } from 'react';
-const INTERPORATION_INTERVAL = 125;
+let INTERPORATION_INTERVAL = 10;
 
 class ReactViewPager extends Component {
 
@@ -28,6 +28,11 @@ class ReactViewPager extends Component {
       // maxPage : 최대로 넘어갈 페이지의 수
       maxPageX: props.nowPageX ? props.maxPageX : props.children.length - 1,
       maxPageY: props.nowPageY ? props.maxPageY : props.children.length - 1,
+
+      style: {
+        transform: `translateX(0px) translateY(0px)`,
+        height: 'inherit',
+      },
     };
 
     this.resetTrigger = false;
@@ -55,7 +60,13 @@ class ReactViewPager extends Component {
     const startY = touchPos.y - moveY;
     this.preMoveX = 0;
     this.preMoveY = 0;
-    this.setState({ startX, startY });
+    const params = {
+      ...this.state,
+      startX,
+      startY,
+    };
+    const style = this.getGroupStyle(params);
+    this.setState({ ...params, style });
   }
 
   handleTouchMove(e) {
@@ -70,7 +81,15 @@ class ReactViewPager extends Component {
       this.preMoveY = this.state.moveY;
       const moveX = touchPos.x - startX;
       const moveY = touchPos.y - startY;
-      this.setState({ moveX, moveY });
+
+      const params = {
+        ...this.state,
+        moveX,
+        moveY,
+      };
+
+      const style = this.getGroupStyle(params);
+      this.setState({ ...params, style });
     }
   }
 
@@ -125,35 +144,39 @@ class ReactViewPager extends Component {
 
     this.preMoveX = 0;
     this.preMoveY = 0;
-    this.setState({
+
+    const pivotX = this.state.pivotX;
+    const pivotY = this.state.pivotY;
+
+    const params = {
+      ...this.state,
       endX: endX - this.state.pivotX, // don't remove this.state.
       endY: endY - this.state.pivotY,
-      moveX: 0,
-      moveY: 0,
       nowPageX,
       nowPageY,
-      pivotX: size.width * nowPageX,
-      pivotY: size.height * nowPageY,
+      nextPivotX: size.width * nowPageX,
+      nextPivotY: size.height * nowPageY,
+      pivotX,
+      pivotY,
+    };
+
+    const style = this.getGroupStyle(params);
+
+    this.setState({
+      ...params,
+      style,
     });
   }
 
-  getResetActionStyle() {
-    const {
-      startX,
-      startY,
-      endX,
-      endY,
-      pivotX,
-      pivotY,
-    } = this.state;
+  getResetActionStyle(cameraStartX, cameraStartY, cameraEndX, cameraEndY) {
     const { isHorizontal, isVertical } = this.props;
-    const fromTransX = isHorizontal ? `translateX(${endX - startX}px)` : '';
-    const fromTransY = isVertical ? `translateY(${endY - startY}px)` : '';
-    const toTransX = isHorizontal ? `translateX(${-pivotX}px)` : '';
-    const toTransY = isVertical ? `translateY(${-pivotY}px)` : '';
+    const fromTransX = isHorizontal ? `translateX(${-cameraStartX}px)` : '';
+    const fromTransY = isVertical ? `translateY(${-cameraStartY}px)` : '';
+    const toTransX = isHorizontal ? `translateX(${-cameraEndX}px)` : '';
+    const toTransY = isVertical ? `translateY(${-cameraEndY}px)` : '';
 
     const styleSheet = document.styleSheets[0];
-    const keyframes = `@-webkit-keyframes reset {
+    const keyframes = `@-webkit-keyframes reset${this.animationCnt} {
         from {
           transform: ${fromTransX} ${fromTransY};
         } 
@@ -163,29 +186,31 @@ class ReactViewPager extends Component {
       }`;
     styleSheet.insertRule(keyframes, styleSheet.cssRules.length);
 
+    console.log(keyframes);
+
     return {
       transform: `${toTransX} ${toTransY}`,
-      animation: 'reset .3s ease-out',
+      animation: `reset${this.animationCnt} .2s ease-out`,
       height: 'inherit',
     };
   }
 
-  getGroupStyle() {
-    const { moveX, moveY, pivotX, pivotY } = this.state;
+  getGroupStyle(params) {
+    const { moveX, moveY, pivotX, pivotY, nextPivotX, nextPivotY } = params;
     const { isHorizontal, isVertical } = this.props;
     const { preMoveX, preMoveY } = this;
 
-    const prePosX = isHorizontal ? preMoveX - pivotX : 0;
-    const prePosY = isVertical ? preMoveY - pivotY : 0;
-    const posX = isHorizontal ? moveX - pivotX : 0;
-    const posY = isVertical ? moveY - pivotY : 0;
+    let prePosX = isHorizontal ? preMoveX - pivotX : 0;
+    let prePosY = isVertical ? preMoveY - pivotY : 0;
+    let posX = isHorizontal ? moveX - pivotX : 0;
+    let posY = isVertical ? moveY - pivotY : 0;
 
     let style = {
-      transform: `translateX(${prePosX}px) translateY(${prePosY}px)`,
+      transform: `translateX(${posX}px) translateY(${posY}px)`,
       height: 'inherit',
     };
 
-    if (this.interporateTimer >= 100) {
+    if (this.interporateTimer >= INTERPORATION_INTERVAL) {
       const styleSheet = document.styleSheets[0];
       this.animationCnt += 1;
       const keyframes = `@-webkit-keyframes interpolate${this.animationCnt} {
@@ -202,7 +227,18 @@ class ReactViewPager extends Component {
     }
 
     if (this.resetTrigger) {
-      style = this.getResetActionStyle();
+      setTimeout(() => {
+        style = this.getResetActionStyle(-posX, -posY, nextPivotX, nextPivotY); // 카메라 좌표라고 봐도 됨
+        // 다음 장으로 좌표를 바꾸는 걸 여기서 해야 함
+        this.setState({
+          style,
+          pivotX: nextPivotX,
+          pivotY: nextPivotY,
+          moveX: 0,
+          moveY: 0,
+        });
+
+      }, this.interporateTimer);
       this.resetTrigger = false;
     }
 
@@ -230,13 +266,13 @@ class ReactViewPager extends Component {
 
   render() {
     const size = this.getSize();
-    const style = this.getGroupStyle();
 
+    console.log(this.state.style);
     return (
       <div
         style={{ width: size.width, height: size.height, overflow: 'hidden', zoom: 1 }}
       >
-        <div style={style}>
+        <div style={this.state.style}>
           {this.createViews()}
         </div>
       </div>
